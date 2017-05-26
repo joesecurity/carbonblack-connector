@@ -1,18 +1,18 @@
 #!/bin/sh
 #
-# cb-lastline-connector
+# cb-joesandbox-connector
 #
 # chkconfig:   2345 55 25
-# description: The Carbon Black Lastline Bridge is a Carbon Black component \
-#              that integrates with Lastline to provide \
-#              a Carbon Black feed of Lastline hits against binaries run in your environment.
+# description: The Carbon Black Joe Sandbox Bridge is a Carbon Black component \
+#              that integrates with Joe Sandbox to provide \
+#              a Carbon Black feed of Joe Sandbox hits against binaries run in your environment.
 
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-exec="/usr/share/cb/integrations/lastline/cb-lastline-connector"
-prog="cb-lastline-connector"
-pidfile="/var/run/cb/integrations/lastline.pid"
+exec="/usr/share/cb/integrations/joesandbox/cb-joesandbox-connector"
+prog="cb-joesandbox-connector"
+pidfile="/var/run/cb/integrations/joesandbox.pid"
 
 lockfile=/var/lock/subsys/$prog
 

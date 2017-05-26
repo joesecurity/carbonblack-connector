@@ -1,6 +1,6 @@
 __author__ = 'jgarman'
 
-from cbopensource.connectors.lastline import __version__
+from cbopensource.connectors.joesandbox import __version__
 
 from distutils.core import setup
 from distutils.core import Command
@@ -138,25 +138,25 @@ def get_data_files(rootdir):
     return results
 
 data_files = get_data_files("root")
-data_files.append('cb-lastline-connector.spec')
-data_files.append('scripts/cb-lastline-connector')
+data_files.append('cb-joesandbox-connector.spec')
+data_files.append('scripts/cb-joesandbox-connector')
 scripts = {
-    'cb-lastline-connector': {
-        'spec': 'cb-lastline-connector.spec',
-        'dest': '/usr/share/cb/integrations/lastline/cb-lastline-connector'
+    'cb-joesandbox-connector': {
+        'spec': 'cb-joesandbox-connector.spec',
+        'dest': '/usr/share/cb/integrations/joesandbox/cb-joesandbox-connector'
     }
 }
 
 setup(
-    name='python-cb-lastline-connector',
+    name='python-cb-joesandbox-connector',
     version='1.2',
-    packages=['cbopensource', 'cbopensource.connectors', 'cbopensource.connectors.lastline'],
-    url='https://github.com/carbonblack/cb-lastline-connector',
+    packages=['cbopensource', 'cbopensource.connectors', 'cbopensource.connectors.joesandbox'],
+    url='https://github.com/carbonblack/cb-joesandbox-connector',
     license='MIT',
     author='Bit9 + Carbon Black Developer Network',
     author_email='dev-support@bit9.com',
     description=
-        'Connector between Carbon Black and Lastline',
+        'Connector between Carbon Black and Joe Sandbox',
     data_files=data_files,
     classifiers=[
         'Development Status :: 4 - Beta',

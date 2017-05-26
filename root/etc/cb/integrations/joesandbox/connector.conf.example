@@ -1,0 +1,157 @@
+[bridge]
+
+;
+; core configuration options
+;
+
+;
+; listener_port
+; port to listen for incoming feed requests
+;
+listener_port=4000
+
+;
+; listener_address
+; ipv4 address to listen; defaults to 127.0.0.1
+; 0.0.0.0 binds to all interfaces
+;
+listener_address=0.0.0.0
+
+;
+; feed_host
+; the IP address of this machine for Cb to contact with feed requests
+;
+feed_host=127.0.0.1
+
+;
+; binary_filter_query
+; Additional query options to filter only binaries of interest to the Joe Sandbox connector
+;
+binary_filter_query=is_executable_image:true -(digsig_publisher:"Microsoft Corporation" and digsig_result:"Signed")
+
+; Concurrency settings
+;
+; The following two parameters control how many concurrent queries will be
+; performed against the Joe Sandbox server. The "quick_scan_threads" setting
+; specifies how many threads will be querying the Joe Sandbox appliance via
+; file hash at once. The "deep_scan_threads" setting specifies how many
+; full file scans can be actively "in flight" at a given time. The default
+; is that three files can be analyzed in parallel at any given time.
+
+;joesandbox_quick_scan_threads=1
+;joesandbox_deep_scan_threads=3
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Joe Sandbox Settings                                                   ;;
+;; https://jbxcloud.joesecurity.org/userguide?sphinxurl=usage/webapi.html ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;
+; Joe Sandbox API URL
+;
+; cloud example: https://jbxcloud.joesecurity.org
+; local example: https://onpremise.example.net/index.php/
+;
+; Also enable or disable ssl verification.
+;
+joesandbox_url=https://jbxcloud.joesecurity.org
+joesandbox_url_sslverify=1
+
+;
+; Joe Sandbox API key
+;
+; You can find this key in the settings tab of Joe Sandbox.
+;
+joesandbox_apikey=
+
+;
+; Agreement to the Terms and Conditions of Joe Sandbox Cloud
+; https://jbxcloud.joesecurity.org/index.php/download/termsandconditions.pdf
+;
+; By settings this value to 1, you agree to the terms and conditions.
+; This is required for Joe Sandbox Cloud.
+;
+;joesandbox_tandc=1
+
+; Specify the architecture on which to run the sample
+;joesandbox_architecture=osx
+joesandbox_architecture=windows
+
+; Comma-separated list of systems for the analysis.
+; Leave empty for automatic system selection (Windows only)
+;joesandbox_systems=w7_1,w7_2
+
+; enable sandbox internet access
+;joesandbox_inet=1
+
+; enable https inspection
+;joesandbox_ssl=1
+
+; enable hybrid code analysis (HCA)
+;joesandbox_scae=1
+
+; enable hybrid decompilation (HDC)
+;joesandbox_dec=1
+
+; enable adaptive internet simulation (AIS)
+;joesandbox_ais=1
+
+; enable VBA instrumentation
+;joesandbox_vbainstr=1
+
+; enable automatically submitting dropped non-executed PE files
+;joesandbox_resubmit_dropped=1
+
+; enable Joe Sandbox filter. Do not analyize benign samples.
+;joesandbox_filter=1
+
+; enable hyper mode (faster but less deep analysis)
+;joesandbox_hyper=1
+
+; enable cached response if the sample has been analysed before
+;joesandbox_cache_sha256=1
+
+; add a comment to each submission
+;joesandbox_comments=submitted through Carbon Black
+
+; receive an email notification when an analysis finishes
+;joesandbox_send_on_complete=1
+
+; export the reports to Joe Sandbox View
+; https://jbxcloud.joesecurity.org/userguide?sphinxurl=usage/view.html
+;joesandbox_export_to_jbxview=1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Carbon Black Enterprise Server options ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;
+; Carbon Black Enterprise Server URL
+;
+carbonblack_server_url=https://localhost/
+
+;
+; Carbon Black Enterprise Server API Token
+;
+carbonblack_server_token=
+
+;
+; Carbon Black Enterprise Server SSL Verfication
+;
+carbonblack_server_sslverify=0
+
+;
+; Specify the number of days prior to rescanning a binary
+; Default: 365 days
+;
+days_rescan=365
+
+
+;
+; debugging options
+;
+
+; debug
+; enables various debug output
+;
+debug=1

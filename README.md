@@ -1,9 +1,9 @@
-# Carbon Black - Lastline Connector
+# Carbon Black - Joe Sandbox Connector
 
-The LastLine connector submits binaries collected by Carbon Black to a LastLine
+The Joe Sandbox connector submits binaries collected by Carbon Black to a Joe Sandbox
 appliance for binary analysis. The results are collected and placed into an Intelligence
 Feed on your Carbon Black server. The feed will then tag any binaries executed on your
-endpoints identified as malware by LastLine. Only binaries submitted by the connector
+endpoints identified as malware by Joe Sandbox. Only binaries submitted by the connector
 for analysis will be included in the generated Intelligence Feed.
 
 ## Installation Quickstart
@@ -12,35 +12,35 @@ As root on your Carbon Black or other RPM based 64-bit Linux distribution server
 ```
 cd /etc/yum.repos.d
 curl -O https://opensource.carbonblack.com/release/x86_64/CbOpenSource.repo
-yum install python-cb-lastline-connector
+yum install python-cb-joesandbox-connector
 ```
 
-Once the software is installed via YUM, copy the `/etc/cb/integrations/lastline/connector.conf.example` file to
-`/etc/cb/integrations/lastline/connector.conf`. Edit this file and place your Carbon Black API key into the
+Once the software is installed via YUM, copy the `/etc/cb/integrations/joesandbox/connector.conf.example` file to
+`/etc/cb/integrations/joesandbox/connector.conf`. Edit this file and place your Carbon Black API key into the
 `carbonblack_server_token` variable and your Carbon Black server's base URL into the `carbonblack_server_url` variable.
 
-Then you must place your credentials for LastLine into the configuration file: place your API key and API token
-respectively into the `lastline_api_key` and `lastline_api_token` variables in the 
-`/etc/cb/integrations/lastline/connector.conf` file.
+Then you must place your credentials for Joe Sandbox into the configuration file: place your API key and API token
+respectively into the `joesandbox_api_key` and `joesandbox_api_token` variables in the 
+`/etc/cb/integrations/joesandbox/connector.conf` file.
 
-If you are using an on-premise LastLine appliance, make sure to place the URL for your on-premise LastLine appliance
-in the `lastline_url` variable and set `lastline_url_sslverify` to `0` if your appliance does not have a valid SSL
+If you are using an on-premise Joe Sandbox appliance, make sure to place the URL for your on-premise Joe Sandbox appliance
+in the `joesandbox_url` variable and set `joesandbox_url_sslverify` to `0` if your appliance does not have a valid SSL
 certificate.
 
-Any errors will be logged into `/var/log/cb/integrations/lastline/lastline.log`.
+Any errors will be logged into `/var/log/cb/integrations/joesandbox/joesandbox.log`.
 
 ## Troubleshooting
 
-If you suspect a problem, please first look at the Lastline connector logs found here:
-`/var/log/cb/integrations/lastline/lastline.log`
+If you suspect a problem, please first look at the Joe Sandbox connector logs found here:
+`/var/log/cb/integrations/joesandbox/joesandbox.log`
 (There might be multiple files as the logger "rolls over" when the log file hits a certain size).
 
 If you want to re-run the analysis across your binaries:
 
-1. Stop the service: `service cb-lastline-connector stop`
-2. Remove the database file: `rm /usr/share/cb/integrations/lastline/db/sqlite.db`
+1. Stop the service: `service cb-joesandbox-connector stop`
+2. Remove the database file: `rm /usr/share/cb/integrations/joesandbox/db/sqlite.db`
 3. Remove the feed from your Cb server's Threat Intelligence page
-4. Restart the service: `service cb-lastline-connector start`
+4. Restart the service: `service cb-joesandbox-connector start`
 
 ## Contacting Bit9 Developer Relations Support
 
