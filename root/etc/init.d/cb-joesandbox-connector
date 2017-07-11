@@ -10,7 +10,7 @@
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-exec="/usr/share/cb/integrations/joesandbox/cb-joesandbox-connector"
+exec="/usr/share/cb/integrations/joesandbox/bin/cb-joesandbox-connector"
 prog="cb-joesandbox-connector"
 pidfile="/var/run/cb/integrations/joesandbox.pid"
 
