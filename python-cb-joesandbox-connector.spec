@@ -17,7 +17,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: x86_64
 Vendor: Carbon Black
-Url: http://www.carbonblack.com/
+Url: https://www.carbonblack.com/
 
 %description
 UNKNOWN
