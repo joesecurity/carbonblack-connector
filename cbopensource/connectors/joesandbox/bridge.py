@@ -5,132 +5,136 @@ from cbint.utils.detonation.binary_analysis import (BinaryAnalysisProvider, Anal
                                                     AnalysisTemporaryError, AnalysisResult, AnalysisInProgress)
 import cbint.utils.feed
 import logging
-from jbxapi import joe_api
+import jbxapi
+import json
+import time
 
-
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class JoeSandboxProvider(BinaryAnalysisProvider):
-    def __init__(self, name, apiurl, apikey, params={}, verify_ssl=True):
+    def __init__(self, name, apiurl, apikey, accept_tac, params, verify_ssl, analysis_timeout):
         super(JoeSandboxProvider, self).__init__(name)
 
-        self.joe_api = joe_api(apikey, verify_ssl, apiurl=apiurl)
+        accept_tac = True
+        timeout = 5
+        self.joe = jbxapi.JoeSandbox(apikey=apikey,
+                                     apiurl=apiurl,
+                                     accept_tac=accept_tac,
+                                     verify_ssl=verify_ssl,
+                                     timeout=timeout,
+                                     user_agent="Carbon Black")
         self.apiurl = apiurl
+        self.analysis_timeout = analysis_timeout
         self.params = params
 
     def check_result_for(self, md5sum):
+        logger.info("Checking result for {0}".format(md5sum))
         md5sum = self._normalize_md5(md5sum)
 
-        matches = self.joe_api.search(md5sum)
+        found = False
+        try:
+            analyses = self.joe.analysis_search(md5sum)
 
-        # non-list answer
-        if not isinstance(matches, list):
-            raise AnalysisTemporaryError(matches)
+            for analysis in analyses:
+                info = self.joe.analysis_info(analysis["webid"])
 
-        # joe_api.search() checks multiple fields, thus we need to limit
-        # the results to md5 matches
-        matches = [match for match in matches if match["md5"] == md5sum]
+                # 1. The search checks multiple fields, thus we need to limit
+                #    the results to md5 matches
+                # 2. We cannot use encrypted analyses so we ignore those.
+                if self._normalize_md5(info["md5"]) == md5sum and not info["encrypted"]:
+                    found = True
+                    break
+
+        except jbxapi.ServerOfflineError as e:
+            raise AnalysisTemporaryError(str(e))
+        except jbxapi.ConnectionError as e:
+            raise AnalysisTemporaryError(str(e))
+        except Exception as e:
+            raise AnalysisPermanentError(str(e))
 
         # nothing found
-        if not matches:
+        if not found:
             return None
 
-        # grab the first result
-        result = matches[0]
-        return self._analysis_from_status_dict(result)
+        # short-circuit in progress
+        if info["status"] != "finished":
+            return AnalysisInProgress(retry_in=60)
+
+        return self._interpret_analysis(info["webid"])
 
     def analyze_binary(self, md5sum, binary_file_stream):
+        logger.info("Analyzing binary for {0}".format(md5sum))
         md5sum = self._normalize_md5(md5sum)
 
-        log.info("Submitting binary %s (md5) to Joe Sandbox" % md5sum)
-
-        response = self.joe_api.analyze(binary_file_stream, "", **self.params)
-
         try:
-            webid = response["webid"]
-        except (TypeError, KeyError):
-            raise AnalysisTemporaryError(response)
+            response = self.joe.submit_sample((md5sum, binary_file_stream), params=self.params)
+            submission_id = response["submission_id"]
 
-        status = self.joe_api.status(webid)
+            # wait until the analysis is finished
+            start_time = time.time()
+            while True:
+                submission_info = self.joe.submission_info(submission_id)
+                if submission_info["status"] == "finished":
+                    break
 
-        if not isinstance(status, dict):
-            raise AnalysisTemporaryError(status)
+                if start_time + self.analysis_timeout < time.time():
+                    raise AnalysisPermanentError("Analysis timed out: ({0}s)".format(self.analysis_timeout))
 
-        return self._analysis_from_status_dict(status)
+                time.sleep(60)
 
-    def _analysis_from_status_dict(self, status):
+        except jbxapi.ServerOfflineError as e:
+            raise AnalysisTemporaryError(str(e))
+        except jbxapi.ConnectionError as e:
+            raise AnalysisTemporaryError(str(e))
+        except Exception as e:
+            raise AnalysisPermanentError(str(e))
+
+        if submission_info["most_relevant_analysis"] is None:
+            return AnalysisResult(score=0, title="Clean", message="Sample is empty")
+
+        webid = submission_info["most_relevant_analysis"]["webid"]
+        return self._interpret_analysis(webid)
+
+    def _interpret_analysis(self, webid):
         """
-        Constructs an AnalysisResult or an AnalysisInProgress from a Joe Sandbox
-        json status object to hand back to Carbon Black.
+        Constructs an AnalysisResult or an AnalysisInProgress for the given
+        analysis (webid).
 
         Can throw AnalysisPermanentError or AnalysisTemporaryError.
         """
-
-        # short-circuit in progress
-        if status["status"] == "submitted":
-            return AnalysisInProgress(retry_in=120)
-
-        if status["status"] == "running":
-            return AnalysisInProgress(retry_in=60)
-
-        # from here on we only accept status finished
-        if status["status"] != "finished":
-            raise AnalysisTemporaryError("Unknown status {}".format(status["status"]))
-
-        # check for errors
-        systems = status["systems"].split(";")[:-1]
-        raw_errors = status["errors"].split(";")[:-1]
-        errors = ["{}: {}".format(s, e) for s, e in zip(systems, raw_errors) if e]
-        if errors:
-            raise AnalysisPermanentError("\n".join(errors))
-
-        analysis_result = self._interpret_analysis(status)
-
-        # assign web link
-        analysis_result.link = self.apiurl + "/../analysis/{}".format(status["webid"])
-
-        return analysis_result
-
-    def _interpret_analysis(self, status):
-        """
-        Downloads the irjsonfixed report and constructs an AnalysisResult from it.
-        """
         analysis_result = AnalysisResult()
 
-        # determine the most important run based on the detection number
-        try:
-            raw_detections = [int(d) for d in status["detections"].split(";")[:-1]]
-        except ValueError:
-            raise AnalysisTemporaryError("Wrong format for detection.")
-        else:
-            main_run = raw_detections.index(max(raw_detections))
+        # create analysis url
+        parts = self.apiurl.split("/")
+        while not parts[-1]:
+            parts.pop()
+        assert parts[-1] == "api"
+        parts.pop()
+
+        analysis_result.link = "/".join(parts) + "/analysis/{}".format(webid)
 
         # download ir report
-        ir_report = self.joe_api.report(status["webid"], run=main_run)
+        (_, ir_report) = self.joe.analysis_download(webid, type="irjsonfixed")
+        ir_report = json.loads(ir_report)
 
         # assign carbon black score
-        # https://github.com/carbonblack/cbfeeds
         try:
-            minscore = ir_report["detection"]["minscore"]
-            maxscore = ir_report["detection"]["maxscore"]
-            score = ir_report["detection"]["score"]
+            minscore = ir_report["analysis"]["detection"]["minscore"]
+            maxscore = ir_report["analysis"]["detection"]["maxscore"]
+            score = ir_report["analysis"]["detection"]["score"]
+            detection = ("malicious"  if ir_report["analysis"]["detection"]["malicious"] else
+                         "suspicious" if ir_report["analysis"]["detection"]["suspicious"] else
+                         "clean"      if ir_report["analysis"]["detection"]["clean"] else
+                         "unknown")
         except KeyError:
-            raise AnalysisTemporaryError("Unable to extract score from IR report")
+            raise AnalysisPermanentError("Unable to extract score from IR report")
         else:
             # distribute our score between 0 and 100
             analysis_result.score = int(round((score - minscore) / (maxscore - minscore) * 100.0))
 
         # assign message
-        detection = raw_detections[main_run]
-        if detection == 0:
-            analysis_result.message = "Sample is clean"
-        elif detection == 1:
-            analysis_result.message = "Sample is suspicious"
-        elif detection >= 2:
-            analysis_result.message = "Sample is malicious"
-        else:
-            analysis_result.message = "Unknown classification"
+        analysis_result.title = "Joe Sandbox Detection: " + detection
 
         return analysis_result
 
@@ -138,8 +142,10 @@ class JoeSandboxProvider(BinaryAnalysisProvider):
         """
         Converts md5 strings to lower case.
         """
+        md5sum = md5sum.encode("ascii")
+
         if not isinstance(md5sum, str):
-            raise TypeError("md5sum must be of type str")
+            raise TypeError("md5sum must be of type str, is {0}".format(type(md5sum)))
 
         if not len(md5sum) == 32:
             raise ValueError("invalid length of md5 string")
@@ -150,10 +156,12 @@ class JoeSandboxConnector(DetonationDaemon):
     def get_provider(self):
         return JoeSandboxProvider(
             self.name,
-            apiurl=self.joesandbox_url,
+            apiurl=self.joesandbox_apiurl,
             apikey=self.joesandbox_apikey,
+            accept_tac=self.joesandbox_accept_tac,
             params=self.params,
-            verify_ssl = self.joesandbox_url_sslverify,
+            verify_ssl=self.joesandbox_sslverify,
+            analysis_timeout=self.joesandbox_analysis_timeout
         )
 
     def get_metadata(self):
@@ -170,44 +178,66 @@ class JoeSandboxConnector(DetonationDaemon):
     def validate_config(self):
         super(JoeSandboxConnector, self).validate_config()
 
-        self.check_required_options(["joesandbox_url", "joesandbox_apikey", "joesandbox_url_sslverify", "joesandbox_architecture"])
-        self.joesandbox_url = self.get_config_string("joesandbox_url", None)
-        self.joesandbox_apikey = self.get_config_string("joesandbox_apikey", None)
-        self.joesandbox_url_sslverify = self.get_config_boolean("joesandbox_url_sslverify", True)
+        self.check_required_options(["joesandbox_apiurl", "joesandbox_apikey", "joesandbox_sslverify"])
 
         self.params = {}
-        # read boolean params from config
-        bool_params =  [
-            "inet", "scae", "dec", "ssl", "filter", "hyper", "export_to_jbxview",
-            "cache_sha256", "ais", "vbainstr", "resubmit_dropped", "send_on_complete",
-        ]
-        for key in bool_params:
-            params[key] = self.get_config_boolean("joesandbox_" + key, False)
 
-        # read string params from config
-        params["comments"] = self.get_config_string("joesandbox_comments", "")
-        params["systems"] = self.get_config_string("systems")
+        self.joesandbox_apiurl = self.get_config_string("joesandbox_apiurl", None)
+        self.joesandbox_apikey = self.get_config_string("joesandbox_apikey", None)
+        self.joesandbox_sslverify = self.get_config_boolean("joesandbox_sslverify", True)
+        self.joesandbox_accept_tac = self.get_config_boolean("joesandbox_accept_tac", False)
+        self.joesandbox_analysis_timeout = self.get_config_integer("joesandbox_analysis_timeout", 3600)
 
-        # rename parameters for compatibility with jbxapi.py
-        params["sendoncomplete"] = params.pop("send_on_complete")
-        params["exporttojbxview"] = params.pop("export_to_jbxview")
+        # params
+        systems = self.get_config_string("joesandbox_systems", "").split(",")
+        self.params["systems"] = [x.strip() for x in systems if x.strip()]
+        tags = self.get_config_string("joesandbox_tags", "").split(",")
+        self.params["tags"] = [x.strip() for x in tags if x.strip()]
+        self.params["comments"] = self.get_config_string("joesandbox_comments", None)
+        self.params["analysis-time"] = self.get_config_integer("joesandbox_analysis_time", None)
+        self.params["localized-internet-country"] = self.get_config_string("joesandbox_localized_internet_country", None)
+        self.params["internet-access"] = self.get_config_boolean("joesandbox_internet_access", None)
+        self.params["internet-simulation"] = self.get_config_boolean("joesandbox_internet_simulation", None)
+        self.params["report-cache"] = self.get_config_boolean("joesandbox_report_cache", None)
+        self.params["hybrid-code-analysis"] = self.get_config_boolean("joesandbox_hybrid_code_analysis", None)
+        self.params["hybrid-decompilation"] = self.get_config_boolean("joesandbox_hybrid_decompilation", None)
+        self.params["ssl-inspection"] = self.get_config_boolean("joesandbox_ssl_inspection", None)
+        self.params["vba-instrumentation"] = self.get_config_boolean("joesandbox_vba_instrumentation", None)
+        self.params["js-instrumentation"] = self.get_config_boolean("joesandbox_js_instrumentation", None)
+        self.params["java-jar-tracing"] = self.get_config_boolean("joesandbox_java_jar_tracing", None)
+        self.params["static-only"] = self.get_config_boolean("joesandbox_static_only", None)
+        self.params["start-as-normal-user"] = self.get_config_boolean("joesandbox_start_as_normal_user", None)
+        self.params["anti-evasion-date"] = self.get_config_boolean("joesandbox_anti_evasion_date", None)
+        self.params["language-and-locale"] = self.get_config_boolean("joesandbox_language_and_locale", None)
+        self.params["archive-no-unpack"] = self.get_config_boolean("joesandbox_archive_no_unpack", None)
+        self.params["hypervisor-based-inspection"] = self.get_config_boolean("joesandbox_hypervisor_based_inspection", None)
+        self.params["fast-mode"] = self.get_config_boolean("joesandbox_fast_mode", None)
+        self.params["secondary-results"] = self.get_config_boolean("joesandbox_secondary_results", None)
+        self.params["apk-instrumentation"] = self.get_config_boolean("joesandbox_apk_instrumentation", None)
+        self.params["amsi-unpacking"] = self.get_config_boolean("joesandbox_amsi_unpacking", None)
+
+        # JOE SANDBOX CLOUD EXCLUSIVE PARAMETERS
+        self.params["url-reputation"] = self.get_config_boolean("joesandbox_url_reputation", None)
+        self.params["delete-after-days"] = self.get_config_boolean("joesandbox_delete_after_days", None)
+
+        # ON PREMISE EXCLUSIVE PARAMETERS
+        self.params["priority"] = self.get_config_boolean("joesandbox_priority", None)
 
         return True
 
     @property
     def filter_spec(self):
-        arch = self.get_config_string("joesandbox_architecture", None)
+        filters = self.get_config_string("binary_filter_query", "")
+        filters = filters.replace("\r", "\n")
+        filters = filters.split("\n")
 
-        filters = [
-            'os_type:{}'.format(arch),                         # executable architecture
-            'orig_mod_len:[1 TO {}]'.format(10 * 1024 * 1024), # max. size of binary at time of collection
-        ]
+        # remove empty ones and rejoin
+        filters = [x.strip() for x in filters if x.strip()]
+        filters = ' '.join(filters)
 
-        additional_filter_requirements = self.get_config_string("binary_filter_query", None)
-        if additional_filter_requirements:
-            filters.append(additional_filter_requirements)
+        logger.info("Using filter spec: " + filters)
 
-        return ' '.join(filters)
+        return filters
 
     @property
     def num_quick_scan_threads(self):
@@ -224,6 +254,6 @@ if __name__ == '__main__':
     temp_directory = "/tmp/joesandbox"
 
     config_path = os.path.join(my_path, "testing.conf")
-    daemon = JoeSandboxConnector('joesandboxtest', configfile=config_path, work_directory=temp_directory)
+    daemon = JoeSandboxConnector('joesandbox', configfile=config_path, work_directory=temp_directory)
 
     daemon.start()

@@ -4,7 +4,10 @@ a = Analysis(['scripts/cb-joesandbox-connector'],
              hiddenimports=['unicodedata'],
              datas=[ (HOMEPATH + '/cbapi/response/models/*', 'cbapi/response/models/'),
                      (HOMEPATH + '/cbapi/protection/models/*', 'cbapi/protection/models/'),
-                     (HOMEPATH + '/cbapi/defense/models/*', 'cbapi/defense/models/') ],
+                     (HOMEPATH + '/cbapi/psc/defense/models/*', 'cbapi/psc/defense/models/'),
+                     (HOMEPATH + '/cbapi/psc/livequery/models/*', 'cbapi/psc/livequery/models/'),
+                     (HOMEPATH + '/cbapi/psc/threathunter/models/*', 'cbapi/psc/threathunter/models/'),
+                   ],
              hookspath=None,
              runtime_hooks=None)
 pyz = PYZ(a.pure)

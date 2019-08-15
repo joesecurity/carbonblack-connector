@@ -25,9 +25,19 @@ feed_host=127.0.0.1
 
 ;
 ; binary_filter_query
-; Additional query options to filter only binaries of interest to the Joe Sandbox connector
+; Query options to filter only binaries of interest to the Joe Sandbox connector
 ;
-binary_filter_query=is_executable_image:true -(digsig_publisher:"Microsoft Corporation" and digsig_result:"Signed")
+binary_filter_query=
+;	; all executables (unless signed by Microsoft)
+	is_executable_image:true -(digsig_publisher:"Microsoft Corporation" and digsig_result:"Signed")
+
+;	; maximum binary size at time of collection (100MB)
+	orig_mod_len:[1 TO 100000000]
+
+;;	; operating system
+;	os_type:windows
+;	os_type:osx
+;	os_type:linux
 
 ; Concurrency settings
 ;
@@ -41,6 +51,12 @@ binary_filter_query=is_executable_image:true -(digsig_publisher:"Microsoft Corpo
 ;joesandbox_quick_scan_threads=1
 ;joesandbox_deep_scan_threads=3
 
+; Timeout settings
+;
+; The following setting controls how long we wait for an analysis result
+; before giving up. (seconds)
+;joesandbox_analysis_timeout=3600
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Joe Sandbox Settings                                                   ;;
 ;; https://jbxcloud.joesecurity.org/userguide?sphinxurl=usage/webapi.html ;;
@@ -49,13 +65,13 @@ binary_filter_query=is_executable_image:true -(digsig_publisher:"Microsoft Corpo
 ;
 ; Joe Sandbox API URL
 ;
-; cloud example: https://jbxcloud.joesecurity.org
-; local example: https://onpremise.example.net/index.php/
+; cloud example: https://jbxcloud.joesecurity.org/api
+; local example: https://onpremise.example.net/index.php/api
 ;
-; Also enable or disable ssl verification.
-;
-joesandbox_url=https://jbxcloud.joesecurity.org
-joesandbox_url_sslverify=1
+joesandbox_apiurl=https://jbxcloud.joesecurity.org/api
+
+; Enable or disable ssl verification.
+joesandbox_sslverify=1
 
 ;
 ; Joe Sandbox API key
@@ -71,55 +87,46 @@ joesandbox_apikey=
 ; By settings this value to 1, you agree to the terms and conditions.
 ; This is required for Joe Sandbox Cloud.
 ;
-;joesandbox_tandc=1
+;joesandbox_accept_tac=1
 
-; Specify the architecture on which to run the sample
-;joesandbox_architecture=osx
-joesandbox_architecture=windows
+;
+; Analysis parameters
+; See https://jbxcloud.joesecurity.org/userguide?sphinxurl=usage/webapi.html#apiv2-submission-new
+; or your local help for a description of the parameters
+;
 
-; Comma-separated list of systems for the analysis.
-; Leave empty for automatic system selection (Windows only)
-;joesandbox_systems=w7_1,w7_2
+; analysis systems, leave empty for automatic selection
+;joesandbox_systems=w7,w7x64
+;joesandbox_tags=carbonblack,mytag
+;joesandbox_comments=
+;joesandbox_analysis_time=30
+;joesandbox_localized_internet_country=Switzerland
+;joesandbox_internet_access=1
+;joesandbox_internet_simulation=0
+;joesandbox_report_cache=1
+;joesandbox_hybrid_code_analysis=1
+;joesandbox_hybrid_decompilation=1
+;joesandbox_ssl_inspection=1
+;joesandbox_vba_instrumentation=1
+;joesandbox_js_instrumentation=1
+;joesandbox_java_jar_tracing=1
+;joesandbox_static_only=0
+;joesandbox_start_as_normal_user=0
+;joesandbox_anti_evasion_date=1
+;joesandbox_language_and_locale=1
+;joesandbox_archive_no_unpack=1
+;joesandbox_hypervisor_based_inspection=1
+;joesandbox_fast_mode=0
+;joesandbox_secondary_results=1
+;joesandbox_apk_instrumentation=1
+;joesandbox_amsi_unpacking=1
 
-; enable sandbox internet access
-;joesandbox_inet=1
+# JOE SANDBOX CLOUD EXCLUSIVE PARAMETERS
+;joesandbox_url_reputation=0
+;joesandbox_delete_after_days=30
 
-; enable https inspection
-;joesandbox_ssl=1
-
-; enable hybrid code analysis (HCA)
-;joesandbox_scae=1
-
-; enable hybrid decompilation (HDC)
-;joesandbox_dec=1
-
-; enable adaptive internet simulation (AIS)
-;joesandbox_ais=1
-
-; enable VBA instrumentation
-;joesandbox_vbainstr=1
-
-; enable automatically submitting dropped non-executed PE files
-;joesandbox_resubmit_dropped=1
-
-; enable Joe Sandbox filter. Do not analyize benign samples.
-;joesandbox_filter=1
-
-; enable hyper mode (faster but less deep analysis)
-;joesandbox_hyper=1
-
-; enable cached response if the sample has been analysed before
-;joesandbox_cache_sha256=1
-
-; add a comment to each submission
-;joesandbox_comments=submitted through Carbon Black
-
-; receive an email notification when an analysis finishes
-;joesandbox_send_on_complete=1
-
-; export the reports to Joe Sandbox View
-; https://jbxcloud.joesecurity.org/userguide?sphinxurl=usage/view.html
-;joesandbox_export_to_jbxview=1
+# ON PREMISE EXCLUSIVE PARAMETERS
+;joesandbox_priority=2
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Carbon Black Enterprise Server options ;;
