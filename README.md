@@ -8,11 +8,11 @@ for analysis will be included in the generated Intelligence Feed.
 
 ## Installation Quickstart
 
-As root on your Carbon Black or other RPM based 64-bit Linux distribution server:
+First, download the rpm package located in `dist` from Github. As root on your Carbon Black
+or other RPM based 64-bit Linux distribution server:
+
 ```
-cd /etc/yum.repos.d
-curl -O https://opensource.carbonblack.com/release/x86_64/CbOpenSource.repo
-yum install python-cb-joesandbox-connector
+rpm -i python-cb-joesandbox-connector-1.2-8.x86_64.rpm
 ```
 
 Once the software is installed via YUM, copy the `/etc/cb/integrations/joesandbox/connector.conf.example` file to
